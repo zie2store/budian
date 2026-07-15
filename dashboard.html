@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Guru</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; background-color: #f3f4f6; display: flex; flex-direction: column; min-height: 100vh; }
+        
+        /* Header Khusus Mobile */
+        .mobile-header { display: none; background-color: #1e293b; padding: 15px; align-items: center; justify-content: space-between; color: white; }
+        .mobile-header button { background: none; border: none; color: white; font-size: 1.5em; cursor: pointer; padding: 0; }
+
+        /* Sidebar (Responsive) */
+        .sidebar { width: 250px; background-color: #1e293b; color: white; height: 100vh; padding: 20px; box-sizing: border-box; position: fixed; left: 0; top: 0; z-index: 1000; transition: transform 0.3s ease; overflow-y: auto; }
+        .sidebar h2 { margin-top: 0; font-size: 1.5em; border-bottom: 1px solid #334155; padding-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .close-sidebar { display: none; background: none; border: none; color: white; font-size: 1.5em; cursor: pointer; }
+        .sidebar a { display: block; color: white; text-decoration: none; padding: 12px 10px; margin: 5px 0; border-radius: 4px; }
+        .sidebar a:hover { background-color: #334155; }
+        .logout-btn { background-color: #ef4444; color: white; border: none; padding: 12px 10px; width: 100%; text-align: left; cursor: pointer; border-radius: 4px; margin-top: 20px; font-size: 1em; }
+
+        /* Konten Utama */
+        .main-content { margin-left: 250px; padding: 20px; flex: 1; transition: margin-left 0.3s ease; box-sizing: border-box; width: calc(100% - 250px); }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+
+        /* Wrapper Tabel agar bisa di-scroll menyamping di HP */
+        .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; margin-bottom: 15px; }
+
+        /* --- KARTU JADWAL --- */
+        .schedule-grid { display: grid; gap: 15px; grid-template-columns: 1fr; margin-top: 15px; }
+        .schedule-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); position: relative; border-left: 5px solid #ccc; transition: 0.2s; }
+        
+        /* Kartu yang bisa diklik (Hari Ini) */
+        .schedule-card.clickable { cursor: pointer; }
+        .schedule-card.clickable:active { transform: scale(0.98); }
+
+        /* Warna Border Status */
+        .status-now { border-left-color: #2563eb; } /* Biru: Sedang Berlangsung */
+        .status-next { border-left-color: #d97706; } /* Oranye: Selanjutnya */
+        .status-finished { border-left-color: #9ca3af; opacity: 0.7; } /* Abu-abu: Selesai */
+
+        /* Label Status di Pojok Kanan Atas */
+        .status-badge { position: absolute; top: 15px; right: 15px; font-size: 0.75em; font-weight: bold; padding: 4px 8px; border-radius: 12px; }
+        .badge-now { background: #eff6ff; color: #2563eb; }
+        .badge-next { background: #fffbeb; color: #d97706; }
+        .badge-finished { background: #f3f4f6; color: #6b7280; }
+
+        .schedule-time { font-size: 0.9em; color: #6b7280; margin-top: 5px; display: block; }
+        .schedule-class { font-size: 1.2em; font-weight: bold; margin: 0; color: #1f2937; }
+        .schedule-day { font-size: 1em; font-weight: bold; color: #4b5563; margin-bottom: 5px; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;}
+
+        /* --- DESAIN TOGGLE SWITCH PRESENSI --- */
+        .toggle-switch { 
+            position: relative; 
+            display: inline-block; 
+            width: 64px; 
+            height: 34px; 
+        }
+        .toggle-switch input { 
+            opacity: 0; 
+            width: 0; 
+            height: 0; 
+        }
+        .slider { 
+            position: absolute; 
+            cursor: pointer; 
+            top: 0; left: 0; right: 0; bottom: 0; 
+            background-color: #ef4444; /* Merah untuk A */
+            transition: .3s; 
+            border-radius: 34px; 
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); 
+        }
+        .slider:before { 
+            position: absolute; 
+            content: "A"; 
+            color: #ef4444; 
+            font-weight: bold; 
+            text-align: center; 
+            line-height: 26px; 
+            height: 26px; 
+            width: 26px; 
+            left: 4px; 
+            bottom: 4px; 
+            background-color: white; 
+            transition: .3s; 
+            border-radius: 50%; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2); 
+            font-size: 14px;
+        }
+        /* Jika dicentang (Default H) */
+        input:checked + .slider { 
+            background-color: #059669; /* Hijau untuk H */
+        }
+        input:checked + .slider:before { 
+            transform: translateX(30px); 
+            content: "H"; 
+            color: #059669; 
+        }
+
+        /* Pengaturan Khusus Layar HP (Maks lebar 768px) */
+        @media (max-width: 768px) {
+            .mobile-header { display: flex; }
+            .sidebar { transform: translateX(-100%); } /* Sembunyikan sidebar ke kiri */
+            .sidebar.active { transform: translateX(0); } /* Tampilkan sidebar saat aktif */
+            .close-sidebar { display: block; }
+            .main-content { margin-left: 0; padding: 10px; width: 100%; }
+            .card { padding: 15px; }
+            
+            /* Ubah layout form dari menyamping menjadi menurun */
+            .flex-container { flex-direction: column !important; }
+            .flex-container > div { width: 100%; min-width: 100%; }
+            input[type="text"], input[type="date"], select, button { padding: 12px; font-size: 16px; /* font 16px mencegah iPhone auto-zoom saat ngetik */ }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="mobile-header">
+        <button id="btnToggleSidebar">☰</button>
+        <span style="font-weight: bold; font-size: 1.2em;">Mr. Xhin</span>
+        <div style="width: 24px;"></div> </div>
+
+    <div class="sidebar" id="sidebar">
+        <h2>Menu <button id="btnCloseSidebar" class="close-sidebar">&times;</button></h2>
+        <a href="#" id="menuHome">🏠 Beranda</a>
+        <a href="#" id="menuAturJadwal">⏳ Kelola Jadwal</a>
+        <a href="#" id="menuKelas">👥 Kelas & Siswa</a>
+        <a href="#" id="menuPresensi">📅 Input Presensi</a>
+        <a href="#" id="menuRekapPresensi">📊 Rekap Presensi</a>
+        <a href="#" id="menuNilai">📝 Input Nilai</a>
+        <a href="#" id="menuMateri">🔗 Kelola Materi</a>
+        <button id="btnLogout" class="logout-btn">Logout</button>
+    </div>
+
+    <div class="main-content">
+        <div class="card" id="contentArea" style="min-height: 80vh;">
+            <div style="text-align: center; padding-top: 50px; color: #6b7280;">
+                <h2>Memuat Dashboard...</h2>
+                <p>Menyiapkan jadwal mengajar Anda hari ini ⏳</p>
+            </div>
+        </div>
+    </div>   
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+        import Papa from 'https://cdn.jsdelivr.net/npm/papaparse@5.4.1/+esm';
+
+        // MASUKKAN URL DAN KEY SUPABASE ANDA DI SINI
+        const supabaseUrl = 'https://dtbomtpvdpwpbbmcjvnf.supabase.co'
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0Ym9tdHB2ZHB3cGJibWNqdm5mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2OTEwOTEsImV4cCI6MjA5ODI2NzA5MX0.V15MIuScZFKmQMPUIBRg7tHND-1HVOH_yg3ElBMHcts'
+        const supabase = createClient(supabaseUrl, supabaseKey)
+        const namaHari = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+
+        // --- FITUR PERINGATAN DATA BELUM DISIMPAN ---
+        let isDataUnsaved = false; // Status default: tidak ada perubahan
+
+        function validasiPindahData() {
+            if (isDataUnsaved) {
+                const lanjut = confirm('⚠️ Peringatan: Ada perubahan data yang BELUM DISIMPAN! Yakin ingin beralih dan membuang perubahan ini?');
+                if (lanjut) {
+                    isDataUnsaved = false; // Reset status jika user memaksa pindah
+                    return true;
+                }
+                return false; // Batalkan perpindahan
+            }
+            return true;
+        }
+
+        // A. --- LOGIKA TOGGLE SIDEBAR MOBILE ---
+        const sidebar = document.getElementById('sidebar');
+        
+        // Buka Sidebar
+        document.getElementById('btnToggleSidebar').addEventListener('click', () => {
+            sidebar.classList.add('active');
+        });
+        
+        // Tutup Sidebar
+        document.getElementById('btnCloseSidebar').addEventListener('click', () => {
+            sidebar.classList.remove('active');
+        });
+
+        // Otomatis tutup sidebar saat salah satu menu diklik di HP
+        document.querySelectorAll('.sidebar a').forEach(link => {
+            link.addEventListener('click', () => {
+                if(window.innerWidth <= 768) {
+                    sidebar.classList.remove('active');
+                }
+            });
+        });
+
+        // 1. PROTEKSI HALAMAN (AUTH GUARD)
+        async function checkSession() {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                // Jika tidak ada sesi aktif, tendang ke halaman login
+                alert('Anda harus login terlebih dahulu!');
+                window.location.href = 'login.html';
+            }
+        }
+        
+        // Jalankan pengecekan sesi saat halaman pertama kali dimuat
+        checkSession();
+
+        // 2. FUNGSI LOGOUT
+        document.getElementById('btnLogout').addEventListener('click', async () => {
+            if (!validasiPindahData()) return;
+            const { error } = await supabase.auth.signOut();
+            if (!error) {
+                window.location.href = 'login.html';
+            } else {
+                alert('Gagal logout: ' + error.message);
+            }
+        });
+
+       // 3. LOGIKA MENU KELAS & SISWA
+        const contentArea = document.getElementById('contentArea');
+        const menuKelas = document.getElementById('menuKelas');
+
+        menuKelas.addEventListener('click', async (e) => {
+            e.preventDefault(); 
+            if (!validasiPindahData()) return;
+            
+            contentArea.innerHTML = `
+                <h2>Manajemen Data Kelas & Siswa</h2>
+                
+                <div style="background: #f8fafc; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #e2e8f0;">
+                    <h3>1. Tambah Kelas Manual</h3>
+                    <input type="text" id="inputNamaKelas" placeholder="Nama Kelas (Contoh: X TKJ 1)" style="width: calc(100% - 22px); padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px;">
+                    <button id="btnSimpanKelas" style="background: #059669; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer;">Simpan Kelas</button>
+                </div>
+
+                <div style="background: #f8fafc; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #e2e8f0;">
+                    <h3>2. Tambah Siswa Manual</h3>
+                    <select id="selectKelas" style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px;">
+                        <option value="">Memuat data kelas...</option>
+                    </select>
+                    <input type="text" id="inputNis" placeholder="Nomor Induk Siswa (NIS)" style="width: calc(100% - 22px); padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px;">
+                    <input type="text" id="inputNamaSiswa" placeholder="Nama Lengkap Siswa" style="width: calc(100% - 22px); padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px;">
+                    <button id="btnSimpanSiswa" style="background: #2563eb; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer;">Simpan Siswa</button>
+                </div>
+
+                <div style="background: #fffbeb; padding: 15px; border-radius: 6px; border: 1px solid #fde68a;">
+                    <h3>3. Upload Massal via CSV 🚀</h3>
+                    <p style="font-size: 0.9em; color: #92400e;">Format header wajib: <b>NIS, Nama, Kelas</b></p>
+                    <input type="file" id="inputCsv" accept=".csv" style="margin-bottom: 10px; display: block;">
+                    <button id="btnUploadCsv" style="background: #d97706; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer;">Upload & Proses CSV</button>
+                </div>
+            `;
+
+            await muatDaftarKelas();
+
+            document.getElementById('btnSimpanKelas').addEventListener('click', simpanKelas);
+            document.getElementById('btnSimpanSiswa').addEventListener('click', simpanSiswa);
+            document.getElementById('btnUploadCsv').addEventListener('click', prosesCsv);
+        });
+
+        // --- FUNGSI-FUNGSI PENDUKUNG ---
+
+        async function muatDaftarKelas() {
+            const select = document.getElementById('selectKelas');
+            const { data, error } = await supabase.from('kelas').select('*').order('nama_kelas');
+            if (error) return select.innerHTML = '<option value="">Gagal memuat kelas</option>';
+            
+            select.innerHTML = '<option value="">-- Pilih Kelas --</option>';
+            data.forEach(k => select.innerHTML += `<option value="${k.id}">${k.nama_kelas}</option>`);
+        }
+
+        async function simpanKelas() {
+            const nama = document.getElementById('inputNamaKelas').value;
+            if (!nama) return alert('Nama kelas wajib diisi!');
+            const { error } = await supabase.from('kelas').insert([{ nama_kelas: nama }]);
+            if (error) alert('Gagal: ' + error.message);
+            else { alert('Sukses!'); document.getElementById('inputNamaKelas').value = ''; muatDaftarKelas(); }
+        }
+
+        async function simpanSiswa() {
+            const kelasId = document.getElementById('selectKelas').value;
+            const nis = document.getElementById('inputNis').value;
+            const nama = document.getElementById('inputNamaSiswa').value;
+            if (!kelasId || !nis || !nama) return alert('Semua kolom wajib diisi!');
+            const { error } = await supabase.from('siswa').insert([{ kelas_id: kelasId, nis: nis, nama: nama }]);
+            if (error) alert('Gagal: ' + error.message);
+            else { alert('Sukses!'); document.getElementById('inputNis').value = ''; document.getElementById('inputNamaSiswa').value = ''; }
+        }
+
+        // --- FUNGSI PEMROSESAN CSV ---
+        async function prosesCsv() {
+            const fileInput = document.getElementById('inputCsv');
+            if (!fileInput.files.length) return alert('Silakan pilih file CSV terlebih dahulu!');
+            
+            const btn = document.getElementById('btnUploadCsv');
+            btn.innerText = 'Sedang Memproses... (Jangan tutup halaman)';
+            btn.disabled = true;
+
+            Papa.parse(fileInput.files[0], {
+                header: true, // Mengenali baris pertama sebagai nama kolom
+                skipEmptyLines: true,
+                complete: async function(results) {
+                    const dataBaris = results.data;
+                    let sukses = 0;
+                    let gagal = 0;
+
+                    for (const baris of dataBaris) {
+                        const nis = baris.NIS;
+                        const nama = baris.Nama;
+                        const namaKelas = baris.Kelas;
+
+                        if (!nis || !nama || !namaKelas) {
+                            gagal++;
+                            continue; // Lewati jika ada sel yang kosong di baris ini
+                        }
+
+                        // 1. Cek apakah kelas ini sudah ada di database
+                        let { data: cekKelas } = await supabase.from('kelas').select('id').eq('nama_kelas', namaKelas).single();
+                        let idKelasSaatIni;
+
+                        if (!cekKelas) {
+                            // Jika kelas belum ada, buat kelas baru secara otomatis
+                            const { data: kelasBaru, error: errKelas } = await supabase.from('kelas').insert([{ nama_kelas: namaKelas }]).select().single();
+                            if (errKelas) { gagal++; continue; }
+                            idKelasSaatIni = kelasBaru.id;
+                        } else {
+                            idKelasSaatIni = cekKelas.id;
+                        }
+
+                        // 2. Masukkan data siswa ke kelas tersebut
+                        const { error: errSiswa } = await supabase.from('siswa').insert([{
+                            nis: nis,
+                            nama: nama,
+                            kelas_id: idKelasSaatIni
+                        }]);
+
+                        if (errSiswa) {
+                            console.error(`Gagal insert ${nama}:`, errSiswa.message);
+                            gagal++;
+                        } else {
+                            sukses++;
+                        }
+                    }
+
+                    alert(`Proses Selesai!\nSiswa berhasil ditambahkan: ${sukses}\nGagal / Dilewati (kemungkinan NIS duplikat): ${gagal}`);
+                    btn.innerText = 'Upload & Proses CSV';
+                    btn.disabled = false;
+                    muatDaftarKelas(); // Perbarui dropdown kelas
+                }
+            });
+        }
+        // 4. LOGIKA MENU INPUT PRESENSI
+        const menuPresensi = document.getElementById('menuPresensi');
+
+        menuPresensi.addEventListener('click', async (e) => {
+            e.preventDefault();
+            
+            const hariIni = new Date().toISOString().split('T')[0];
+
+            contentArea.innerHTML = `
+                <h2>Input Presensi Harian</h2>
+                
+                <div style="background: #f8fafc; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #e2e8f0;">
+                    <div class="flex-container" style="display: flex; gap: 10px; margin-bottom: 15px;">
+                        <div style="flex: 1;">
+                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">Tanggal</label>
+                            <input type="date" id="inputTanggalPresensi" value="${hariIni}" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                        </div>
+                        <div style="flex: 1;">
+                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">Pilih Kelas</label>
+                            <select id="selectKelasPresensi" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                                <option value="">Memuat data...</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="areaDaftarSiswa" style="display: none;">
+                    <div class="table-responsive">
+                        <table style="width: 100%; border-collapse: collapse; background: white; margin-bottom: 20px; min-width: 300px;">
+                            <thead>
+                                <tr style="background: #1e293b; color: white;">
+                                    <th style="padding: 10px; text-align: left; border: 1px solid #ccc; width: 25%;">NIS</th>
+                                    <th style="padding: 10px; text-align: left; border: 1px solid #ccc; width: 50%;">Nama Siswa</th>
+                                    <th style="padding: 10px; text-align: center; border: 1px solid #ccc; width: 25%;">Kehadiran</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelBodyPresensi">
+                                </tbody>
+                        </table>
+                    </div>
+                    <button id="btnSimpanPresensi" style="background: #059669; color: white; border: none; padding: 14px 20px; border-radius: 4px; cursor: pointer; font-size: 1.1em; width: 100%; font-weight: bold;">💾 Simpan Presensi</button>
+                </div>
+            `;
+
+            await muatOpsiKelasPresensi();
+
+            // Pasang event listener: Jika kelas ATAU tanggal diubah, muat ulang daftar siswanya
+            document.getElementById('selectKelasPresensi').addEventListener('change', function(e) {
+                if (!validasiPindahData()) { this.value = kelasLamaPresensi; return; } // Kembalikan ke pilihan awal jika batal
+                muatDaftarSiswaPresensi();
+            });
+            document.getElementById('inputTanggalPresensi').addEventListener('change', function(e) {
+                if (!validasiPindahData()) { this.value = tanggalLamaPresensi; return; }
+                muatDaftarSiswaPresensi();
+            });
+            
+            document.getElementById('btnSimpanPresensi').addEventListener('click', simpanDataPresensi);
+        });
+
+        // --- FUNGSI PENDUKUNG PRESENSI ---
+
+        async function muatOpsiKelasPresensi() {
+            const select = document.getElementById('selectKelasPresensi');
+            const { data, error } = await supabase.from('kelas').select('*').order('nama_kelas');
+            
+            if (error) return select.innerHTML = '<option value="">Gagal memuat kelas</option>';
+            
+            select.innerHTML = '<option value="">-- Silakan Pilih Kelas --</option>';
+            data.forEach(k => select.innerHTML += `<option value="${k.id}">${k.nama_kelas}</option>`);
+        }
+
+        // Variabel untuk menyimpan pilihan dropdown terakhir (agar bisa di-cancel)
+        let kelasLamaPresensi = '';
+        let tanggalLamaPresensi = '';
+
+        async function muatDaftarSiswaPresensi() {
+            const kelasId = document.getElementById('selectKelasPresensi').value;
+            const tanggal = document.getElementById('inputTanggalPresensi').value;
+            const areaDaftar = document.getElementById('areaDaftarSiswa');
+            const tbody = document.getElementById('tabelBodyPresensi');
+            
+            if (!kelasId || !tanggal) {
+                areaDaftar.style.display = 'none';
+                return;
+            }
+
+            // Simpan status terakhir
+            kelasLamaPresensi = kelasId;
+            tanggalLamaPresensi = tanggal;
+
+            tbody.innerHTML = '<tr><td colspan="3" style="padding:10px;text-align:center;">Memuat data siswa...</td></tr>';
+            areaDaftar.style.display = 'block';
+
+            const { data: dataSiswa } = await supabase.from('siswa').select('*').eq('kelas_id', kelasId).eq('is_aktif', true).order('nama');
+            const { data: dataAbsen } = await supabase.from('presensi').select('siswa_id, status').eq('tanggal', tanggal);
+            
+            const statusTersimpan = {};
+            if (dataAbsen) dataAbsen.forEach(absen => statusTersimpan[absen.siswa_id] = absen.status);
+
+            tbody.innerHTML = ''; 
+            
+            if (dataSiswa) {
+                dataSiswa.forEach(siswa => {
+                    const statusSaatIni = statusTersimpan[siswa.id] || 'H';
+                    const isChecked = (statusSaatIni === 'H') ? 'checked' : '';
+
+                    tbody.innerHTML += `
+                        <tr class="baris-siswa">
+                            <td style="padding: 10px; border: 1px solid #ccc; font-size: 0.9em;">${siswa.nis}</td>
+                            <td style="padding: 10px; border: 1px solid #ccc; font-weight: bold;">${siswa.nama}</td>
+                            <td style="padding: 10px; border: 1px solid #ccc; text-align: center;">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" class="input-kehadiran" data-id="${siswa.id}" ${isChecked}>
+                                    <span class="slider"></span>
+                                </label>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+
+            // SETELAH RENDER: Tambahkan pendeteksi perubahan pada semua toggle
+            document.querySelectorAll('.input-kehadiran').forEach(toggle => {
+                toggle.addEventListener('change', () => {
+                    isDataUnsaved = true; // Tandai bahwa ada perubahan!
+                });
+            });
+        }
+
+        async function simpanDataPresensi() {
+            // ... (kode ambil nilai dll tetap sama seperti sebelumnya) ...
+            const tanggal = document.getElementById('inputTanggalPresensi').value;
+            const kelasId = document.getElementById('selectKelasPresensi').value;
+            if (!tanggal || !kelasId) return alert('Pilih tanggal dan kelas!');
+
+            const btn = document.getElementById('btnSimpanPresensi');
+            btn.innerText = 'Menyimpan...'; btn.disabled = true;
+
+            const semuaBaris = document.querySelectorAll('.baris-siswa');
+            const dataPresensi = [];
+
+            semuaBaris.forEach(baris => {
+                const checkbox = baris.querySelector('.input-kehadiran');
+                dataPresensi.push({
+                    tanggal: tanggal,
+                    siswa_id: checkbox.getAttribute('data-id'),
+                    status: checkbox.checked ? 'H' : 'A',
+                    keterangan: ''
+                });
+            });
+
+            const { error } = await supabase.from('presensi').upsert(dataPresensi, { onConflict: 'tanggal, siswa_id' });
+
+            if (error) {
+                alert('Gagal menyimpan presensi: ' + error.message);
+            } else {
+                alert('Presensi kelas ini berhasil disimpan!');
+                isDataUnsaved = false; // RESET STATUS KARENA SUDAH AMAN TERSIMPAN
+            }
+
+            btn.innerText = '💾 Simpan Data Presensi'; btn.disabled = false;
+        }
+
+        // 5. LOGIKA MENU INPUT NILAI
+        const menuNilai = document.getElementById('menuNilai');
+
+        menuNilai.addEventListener('click', async (e) => {
+            e.preventDefault();
+            if (!validasiPindahData()) return;
+            
+            const hariIni = new Date().toISOString().split('T')[0];
+
+        contentArea.innerHTML = `
+                <h2>Input Nilai Ujian / Tugas</h2>
+                
+                <div style="background: #f8fafc; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #e2e8f0;">
+                    <div class="flex-container" style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                        <div style="flex: 2; min-width: 200px;">
+                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">Nama Tes / Ulangan</label>
+                            <input type="text" id="inputNamaTes" list="saranNamaTes" autocomplete="off" placeholder="Pilih dari daftar atau ketik baru..." style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                            <datalist id="saranNamaTes"></datalist>
+                        </div>
+                        <div style="flex: 1; min-width: 150px;">
+                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">Pilih Kelas</label>
+                            <select id="selectKelasNilai" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                                <option value="">Memuat data...</option>
+                            </select>
+                        </div>
+                        <div style="flex: 1; min-width: 150px;">
+                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">Tanggal Input</label>
+                            <input type="date" id="inputTanggalNilai" value="${hariIni}" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                        </div>
+                    </div>
+                    <p style="font-size: 0.85em; color: #6b7280; margin-top: -5px;">*Ketik Nama Tes baru atau pilih dari daftar jika menginput nilai susulan/remedial agar data tidak ganda.</p>
+                </div>
+
+                <div id="areaDaftarSiswaNilai" style="display: none;">
+                    <div class="table-responsive">
+                        <table style="width: 100%; border-collapse: collapse; background: white; margin-bottom: 20px; min-width: 300px;">
+                            <thead>
+                                <tr style="background: #1e293b; color: white;">
+                                    <th style="padding: 10px; text-align: left; border: 1px solid #ccc; width: 20%;">NIS</th>
+                                    <th style="padding: 10px; text-align: left; border: 1px solid #ccc; width: 55%;">Nama Siswa</th>
+                                    <th style="padding: 10px; text-align: center; border: 1px solid #ccc; width: 25%;">Skor</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelBodyNilai">
+                                </tbody>
+                        </table>
+                    </div>
+                    <button id="btnSimpanNilai" style="background: #2563eb; color: white; border: none; padding: 14px 20px; border-radius: 4px; cursor: pointer; font-size: 1.1em; width: 100%; font-weight: bold;">💾 Simpan/Update</button>
+                </div>
+            `;
+
+            await muatOpsiKelasNilai();
+            await muatSaranNamaTes(); // Panggil fungsi baru ini saat halaman dimuat
+
+            document.getElementById('selectKelasNilai').addEventListener('change', muatDaftarSiswaNilai);
+            document.getElementById('inputNamaTes').addEventListener('change', muatDaftarSiswaNilai); 
+            document.getElementById('btnSimpanNilai').addEventListener('click', simpanDataNilai);
+        });
+
+        // --- FUNGSI PENDUKUNG NILAI ---
+
+        async function muatOpsiKelasNilai() {
+            const select = document.getElementById('selectKelasNilai');
+            const { data, error } = await supabase.from('kelas').select('*').order('nama_kelas');
+            if (error) return select.innerHTML = '<option value="">Gagal memuat kelas</option>';
+            
+            select.innerHTML = '<option value="">-- Silakan Pilih Kelas --</option>';
+            data.forEach(k => select.innerHTML += `<option value="${k.id}">${k.nama_kelas}</option>`);
+        }
+
+        async function muatDaftarSiswaNilai() {
+            const kelasId = document.getElementById('selectKelasNilai').value;
+            const namaTes = document.getElementById('inputNamaTes').value.trim();
+            const areaDaftar = document.getElementById('areaDaftarSiswaNilai');
+            const tbody = document.getElementById('tabelBodyNilai');
+            
+            if (!kelasId || !namaTes) {
+                areaDaftar.style.display = 'none';
+                return;
+            }
+
+            tbody.innerHTML = '<tr><td colspan="3" style="padding:10px;text-align:center;">Memuat data siswa dan riwayat nilai...</td></tr>';
+            areaDaftar.style.display = 'block';
+
+            // 1. Ambil data siswa aktif
+            const { data: dataSiswa, error: errSiswa } = await supabase.from('siswa').select('id, nis, nama').eq('kelas_id', kelasId).eq('is_aktif', true).order('nama');
+
+            if (errSiswa || dataSiswa.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="padding:10px;text-align:center;color:red;">Tidak ada data siswa.</td></tr>';
+                return;
+            }
+
+            // 2. Cek apakah ada nilai yang sudah tersimpan untuk 'Nama Tes' ini
+            const idSiswaArray = dataSiswa.map(s => s.id);
+            const { data: dataNilaiTersimpan } = await supabase.from('nilai')
+                .select('siswa_id, skor')
+                .eq('nama_tes', namaTes)
+                .in('siswa_id', idSiswaArray);
+
+            // Buat kamus (mapping) nilai yang sudah ada
+            const mapNilai = {};
+            if (dataNilaiTersimpan) {
+                dataNilaiTersimpan.forEach(n => {
+                    mapNilai[n.siswa_id] = n.skor;
+                });
+            }
+
+            // 3. Render tabel
+            tbody.innerHTML = ''; 
+            
+            dataSiswa.forEach(siswa => {
+                const nilaiSaatIni = mapNilai[siswa.id] !== undefined ? mapNilai[siswa.id] : '';
+                tbody.innerHTML += `
+                    <tr class="baris-siswa-nilai" data-id="${siswa.id}">
+                        <td style="padding: 10px; border: 1px solid #ccc; font-size: 0.9em;">${siswa.nis}</td>
+                        <td style="padding: 10px; border: 1px solid #ccc; font-weight: bold;">${siswa.nama}</td>
+                        <td style="padding: 10px; border: 1px solid #ccc; text-align: center;">
+                            <input type="number" class="input-skor" min="0" max="100" placeholder="-" value="${nilaiSaatIni}" style="width: 80px; padding: 10px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; font-size: 1em;">
+                        </td>
+                    </tr>
+                `;
+            });
+
+            // SETELAH RENDER: Tambahkan pendeteksi perubahan saat skor diketik
+            document.querySelectorAll('.input-skor').forEach(input => {
+                input.addEventListener('input', () => {
+                    isDataUnsaved = true; // Tandai bahwa ada skor yang diketik!
+                });
+            });
+        }
+
+        async function simpanDataNilai() {
+            const tanggal = document.getElementById('inputTanggalNilai').value;
+            const namaTes = document.getElementById('inputNamaTes').value.trim();
+            const kelasId = document.getElementById('selectKelasNilai').value;
+            
+            if (!tanggal || !namaTes || !kelasId) {
+                return alert('Tanggal, Nama Tes, dan Kelas wajib diisi!');
+            }
+
+            const btn = document.getElementById('btnSimpanNilai');
+            btn.innerText = 'Menyimpan...';
+            btn.disabled = true;
+
+            const semuaBaris = document.querySelectorAll('.baris-siswa-nilai');
+            const dataNilai = [];
+            let adaErrorInput = false;
+
+            semuaBaris.forEach(baris => {
+                const siswaId = baris.getAttribute('data-id');
+                const skor = baris.querySelector('.input-skor').value;
+
+                // Hanya ambil siswa yang kotak nilainya ada angkanya
+                if (skor !== "") {
+                    const angkaSkor = parseFloat(skor);
+                    if (angkaSkor < 0 || angkaSkor > 100) {
+                        adaErrorInput = true;
+                    } else {
+                        dataNilai.push({
+                            nama_tes: namaTes,
+                            tanggal: tanggal, // Tanggal akan otomatis ter-update untuk siswa yang susulan hari ini
+                            siswa_id: siswaId,
+                            skor: angkaSkor
+                        });
+                    }
+                }
+            });
+
+            if (adaErrorInput) {
+                btn.innerText = '💾 Simpan / Update Nilai';
+                btn.disabled = false;
+                return alert('Ada nilai yang tidak valid! Pastikan semua skor di antara 0 hingga 100.');
+            }
+
+            if (dataNilai.length === 0) {
+                btn.innerText = '💾 Simpan / Update Nilai';
+                btn.disabled = false;
+                return alert('Tidak ada nilai yang diisi.');
+            }
+
+            // Gunakan UPSERT berdasarkan 'nama_tes, siswa_id'
+            const { error } = await supabase.from('nilai').upsert(dataNilai, { onConflict: 'nama_tes, siswa_id' });
+
+            if (error) {
+                alert('Gagal menyimpan nilai: ' + error.message);
+            } else {
+                alert('Nilai berhasil disimpan / diperbarui!');
+                isDataUnsaved = false; // RESET STATUS
+            }
+
+            btn.innerText = '💾 Simpan / Update Nilai'; btn.disabled = false;
+        }
+        
+        // 6. LOGIKA MENU KELOLA MATERI (LINKTREE)
+        const menuMateri = document.getElementById('menuMateri');
+
+        menuMateri.addEventListener('click', async (e) => {
+            e.preventDefault();
+            if (!validasiPindahData()) return;
+            
+            contentArea.innerHTML = `
+                <h2>Kelola Tautan Materi (Linktree)</h2>
+                
+                <div style="background: #f8fafc; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #e2e8f0;">
+                    <h3>Tambah Tautan Baru</h3>
+                    
+                    <div class="flex-container" style="display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
+                        <div style="flex: 2; min-width: 200px;">
+                            <input type="text" id="inputJudulMateri" placeholder="Judul Materi (Cth: Teks Procedure)" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                        </div>
+                        <div style="flex: 1; min-width: 150px; display: flex; gap: 5px;">
+                            <select id="selectKategoriMateri" style="flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                                <option value="">-- Kategori (Opsional) --</option>
+                            </select>
+                            <button id="btnTambahKategori" style="background: #4f46e5; color: white; border: none; border-radius: 4px; padding: 0 10px; cursor: pointer; font-weight: bold;" title="Tambah Kategori Baru">+</button>
+                        </div>
+                    </div>
+
+                    <input type="url" id="inputUrlMateri" placeholder="URL / Link (Cth: https://drive.google.com/...)" style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                    <input type="text" id="inputDeskripsiMateri" placeholder="Deskripsi Singkat (Opsional)" style="width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="font-weight: bold; display: block; margin-bottom: 5px;">Target Kelas (Bisa pilih lebih dari satu):</label>
+                        <div id="wadahCheckboxKelas" style="display: flex; flex-wrap: wrap; gap: 10px; padding: 10px; background: white; border: 1px solid #ccc; border-radius: 4px; max-height: 150px; overflow-y: auto;">
+                            Memuat daftar kelas...
+                        </div>
+                    </div>
+
+                    <button id="btnSimpanMateri" style="background: #059669; color: white; border: none; padding: 12px 15px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold;">Simpan Tautan</button>
+                </div>
+
+                <div style="background: white; padding: 15px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                    <h3 style="margin-top:0;">Daftar Tautan Aktif</h3>
+                    <div class="table-responsive">
+                        <table style="width: 100%; border-collapse: collapse; min-width: 500px;">
+                            <thead>
+                                <tr style="background: #1e293b; color: white;">
+                                    <th style="padding: 10px; border: 1px solid #ccc; text-align: left;">Informasi Tautan</th>
+                                    <th style="padding: 10px; border: 1px solid #ccc; text-align: center; width: 15%;">URL</th>
+                                    <th style="padding: 10px; border: 1px solid #ccc; text-align: center; width: 15%;">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelBodyMateri">
+                                <tr><td colspan="3" style="text-align:center; padding:10px;">Memuat data...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+
+            await muatKategoriMateri();
+            await muatCheckboxKelas();
+            await muatDaftarMateriLengkap();
+
+            document.getElementById('btnTambahKategori').addEventListener('click', tambahKategoriBaru);
+            document.getElementById('btnSimpanMateri').addEventListener('click', simpanMateriLengkap);
+        });
+
+        // --- FUNGSI PENDUKUNG MATERI BARU ---
+        
+        async function muatKategoriMateri() {
+            const select = document.getElementById('selectKategoriMateri');
+            const { data } = await supabase.from('kategori_materi').select('*').order('nama_kategori');
+            select.innerHTML = '<option value="">-- Kategori (Opsional) --</option>';
+            if (data) data.forEach(k => select.innerHTML += `<option value="${k.id}">${k.nama_kategori}</option>`);
+        }
+
+        async function tambahKategoriBaru() {
+            const namaBaru = prompt("Masukkan nama kategori baru (Misal: Grammar, Reading, Ujian):");
+            if (namaBaru && namaBaru.trim() !== "") {
+                const { error } = await supabase.from('kategori_materi').insert([{ nama_kategori: namaBaru.trim() }]);
+                if (error) alert("Gagal menambah kategori: " + error.message);
+                else await muatKategoriMateri();
+            }
+        }
+
+        async function muatCheckboxKelas() {
+            const wadah = document.getElementById('wadahCheckboxKelas');
+            const { data } = await supabase.from('kelas').select('*').order('nama_kelas');
+            wadah.innerHTML = '';
+            if (data) {
+                data.forEach(k => {
+                    wadah.innerHTML += `
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; background: #f3f4f6; padding: 5px 10px; border-radius: 20px; font-size: 0.9em;">
+                            <input type="checkbox" class="chk-kelas-target" value="${k.id}"> ${k.nama_kelas}
+                        </label>
+                    `;
+                });
+            }
+        }
+
+        async function muatDaftarMateriLengkap() {
+            const tbody = document.getElementById('tabelBodyMateri');
+            // Query cerdas: Ambil materi beserta nama kategori dan daftar kelasnya sekaligus
+            const { data, error } = await supabase.from('materi_link')
+                .select('*, kategori_materi(nama_kategori), materi_kelas(kelas(nama_kelas))')
+                .order('created_at', { ascending: false });
+
+            if (error || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:10px;">Belum ada tautan materi.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            data.forEach(materi => {
+                const kategori = materi.kategori_materi ? materi.kategori_materi.nama_kategori : 'Tanpa Kategori';
+                
+                // Susun nama kelas yang menjadi target
+                let targetKelas = 'Semua Kelas (Umum)';
+                if (materi.materi_kelas && materi.materi_kelas.length > 0) {
+                    targetKelas = materi.materi_kelas.map(mk => mk.kelas.nama_kelas).join(', ');
+                }
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid #ccc;">
+                            <strong style="font-size: 1.1em; color: #1e3a8a;">${materi.judul}</strong><br>
+                            <span style="font-size: 0.85em; background: #e0e7ff; color: #3730a3; padding: 2px 6px; border-radius: 4px; margin-right: 5px;">📂 ${kategori}</span>
+                            <span style="font-size: 0.85em; background: #fef3c7; color: #92400e; padding: 2px 6px; border-radius: 4px;">🎯 ${targetKelas}</span>
+                            <div style="color: #6b7280; font-size: 0.9em; margin-top: 5px;">${materi.deskripsi || '-'}</div>
+                        </td>
+                        <td style="padding: 10px; border: 1px solid #ccc; text-align: center;">
+                            <a href="${materi.url}" target="_blank" style="color: #2563eb; text-decoration: none; font-weight: bold;">Buka Link</a>
+                        </td>
+                        <td style="padding: 10px; border: 1px solid #ccc; text-align: center;">
+                            <button onclick="hapusMateri(${materi.id})" style="background: #ef4444; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">🗑️ Hapus</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function simpanMateriLengkap() {
+            const judul = document.getElementById('inputJudulMateri').value.trim();
+            const url = document.getElementById('inputUrlMateri').value.trim();
+            const deskripsi = document.getElementById('inputDeskripsiMateri').value.trim();
+            const kategoriId = document.getElementById('selectKategoriMateri').value;
+            
+            if (!judul || !url) return alert('Judul dan URL wajib diisi!');
+
+            // Ambil semua ID kelas yang dicentang
+            const checkboxTerpilih = document.querySelectorAll('.chk-kelas-target:checked');
+            const kelasIds = Array.from(checkboxTerpilih).map(cb => cb.value);
+
+            const btn = document.getElementById('btnSimpanMateri');
+            btn.innerText = 'Menyimpan...';
+            btn.disabled = true;
+
+            // 1. Simpan materi utama
+            const { data: materiBaru, error: errMateri } = await supabase.from('materi_link').insert([{
+                judul: judul,
+                url: url,
+                deskripsi: deskripsi,
+                kategori_id: kategoriId || null // Jika kosong set null
+            }]).select().single();
+
+            if (errMateri) {
+                alert('Gagal menyimpan tautan: ' + errMateri.message);
+                btn.innerText = 'Simpan Tautan'; btn.disabled = false; return;
+            }
+
+            // 2. Simpan relasi ke kelas-kelas (Jika ada yang dicentang)
+            if (kelasIds.length > 0) {
+                const relasiData = kelasIds.map(k_id => ({ materi_id: materiBaru.id, kelas_id: k_id }));
+                await supabase.from('materi_kelas').insert(relasiData);
+            }
+
+            // Sukses, reset form
+            document.getElementById('inputJudulMateri').value = '';
+            document.getElementById('inputUrlMateri').value = '';
+            document.getElementById('inputDeskripsiMateri').value = '';
+            document.querySelectorAll('.chk-kelas-target').forEach(cb => cb.checked = false);
+            
+            await muatDaftarMateriLengkap(); // Refresh tabel
+            
+            btn.innerText = 'Simpan Tautan';
+            btn.disabled = false;
+        }
+
+        // --- 7. MENAMPILKAN JADWAL ---
+        const menuHome = document.getElementById('menuHome');
+        menuHome.addEventListener('click', async (e) => {
+            e.preventDefault();
+            if (!validasiPindahData()) return;
+            
+            const now = new Date();
+            // Ambil jam saat ini dengan format HH:MM (contoh: "08:30", "14:15")
+            const jamSekarang = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+            const hariIniInt = now.getDay();
+            
+            // Ambil seluruh data jadwal dari database
+            const { data: semuaJadwal, error } = await supabase.from('jadwal_mengajar')
+                .select('*, kelas(nama_kelas)').order('hari_int').order('jam_mulai');
+
+            const kontenArea = document.getElementById('contentArea');
+
+            if (error || !semuaJadwal || semuaJadwal.length === 0) {
+                kontenArea.innerHTML = `
+                    <h2>Jadwal Mengajar Anda</h2>
+                    <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                        <p style="color: #6b7280;">Belum ada jadwal yang diatur. Silakan menuju menu Kelola Jadwal.</p>
+                    </div>`;
+                return;
+            }
+
+            // 1. Kelompokkan jadwal per hari (0: Minggu - 6: Sabtu) untuk mempermudah pencarian
+            const jadwalPerHari = {0:[], 1:[], 2:[], 3:[], 4:[], 5:[], 6:[]};
+            semuaJadwal.forEach(j => jadwalPerHari[j.hari_int].push(j));
+
+            // 2. Tentukan Mode: Apakah menampilkan Hari Ini atau Selanjutnya (Batas jam 14:00)
+            let isNextDayMode = jamSekarang >= "14:00" || jadwalPerHari[hariIniInt].length === 0;
+            let targetHariInt = hariIniInt;
+            let targetDate = new Date(now);
+            let judulSesiUtama = "📅 Jadwal Hari Ini";
+
+            if (isNextDayMode) {
+                judulSesiUtama = "⏭️ Jadwal Selanjutnya";
+                
+                // Cari hari terdekat berikutnya yang memiliki jadwal (Maksimal cari 7 hari ke depan)
+                for (let i = 1; i <= 7; i++) {
+                    let nextDay = (hariIniInt + i) % 7;
+                    if (jadwalPerHari[nextDay].length > 0) {
+                        targetHariInt = nextDay;
+                        targetDate.setDate(now.getDate() + i); // Setel tanggal aktual untuk hari tersebut
+                        break;
+                    }
+                }
+            }
+
+            // Format tanggal akhir untuk ditampilkan (Contoh: Selasa, 30 Juni 2026)
+            const tanggalLengkapUtama = targetDate.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+            // 3. Bangun Kerangka UI Utama
+            kontenArea.innerHTML = `
+                <h2>Jadwal Mengajar Anda</h2>
+                
+                <div style="background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <h3 style="margin: 0 0 10px 0; color: #1e3a8a;">${judulSesiUtama}</h3>
+                    <p style="margin: 0; color: #3b82f6; font-size: 0.9em; font-weight: bold;">${tanggalLengkapUtama}</p>
+                    <div id="wadahJadwalUtama" class="schedule-grid"></div>
+                </div>
+
+                <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <h3 style="margin: 0 0 10px 0; color: #374151;">📋 Semua Jadwal Mengajar</h3>
+                    <div id="wadahSemuaJadwal" class="schedule-grid"></div>
+                </div>
+            `;
+
+            const wadahUtama = document.getElementById('wadahJadwalUtama');
+            const wadahSemua = document.getElementById('wadahSemuaJadwal');
+
+            // 4. Render Kartu "Semua Jadwal"
+            semuaJadwal.forEach(jadwal => {
+                const jamMulai = jadwal.jam_mulai.substring(0, 5);
+                const jamSelesai = jadwal.jam_selesai.substring(0, 5);
+                wadahSemua.innerHTML += `
+                    <div class="schedule-card status-finished" style="border-left-color: #64748b; padding: 10px 15px;">
+                        <div class="schedule-day">${namaHari[jadwal.hari_int]}</div>
+                        <h4 class="schedule-class" style="font-size: 1em;">${jadwal.kelas.nama_kelas}</h4>
+                        <span class="schedule-time">🕒 ${jamMulai} - ${jamSelesai}</span>
+                    </div>
+                `;
+            });
+
+            // 5. Render Kartu Utama (Berdasarkan Mode Waktu)
+            if (jadwalPerHari[targetHariInt].length === 0) {
+                wadahUtama.innerHTML = '<p style="color: #6b7280; font-size: 0.9em;">Tidak ada jadwal mengajar yang ditemukan.</p>';
+            } else {
+                jadwalPerHari[targetHariInt].forEach(jadwal => {
+                    const jamMulai = jadwal.jam_mulai.substring(0, 5);
+                    const jamSelesai = jadwal.jam_selesai.substring(0, 5);
+                    
+                    let statusClass, badgeClass, label, ctaText, ctaColor;
+                    let atributKlik = ''; // Kosong secara default
+                    let classKlik = '';   // Kosong secara default
+
+                    if (isNextDayMode) {
+                        statusClass = 'status-next'; badgeClass = 'badge-next'; label = 'Up Next';
+                        ctaText = 'Persiapkan Materi 📚';
+                        ctaColor = '#d97706';
+                    } else {
+                        if (jamSekarang > jamSelesai) {
+                            statusClass = 'status-finished'; badgeClass = 'badge-finished'; label = 'Finished';
+                            ctaText = 'Jangan lupa buat jurnal 📝';
+                            ctaColor = '#6b7280';
+                        } else if (jamSekarang >= jamMulai && jamSekarang <= jamSelesai) {
+                            statusClass = 'status-now'; badgeClass = 'badge-now'; label = '🔴 Now';
+                            ctaText = 'Ketuk untuk Absen &rarr;';
+                            ctaColor = '#2563eb';
+                            // HANYA JIKA SEDANG BERLANGSUNG, KARTU BISA DIKLIK
+                            classKlik = 'clickable';
+                            atributKlik = `onclick="bukaPresensiDariJadwal(${jadwal.kelas_id})"`;
+                        } else {
+                            statusClass = 'status-next'; badgeClass = 'badge-next'; label = 'Up Next';
+                            ctaText = 'Persiapkan Materi 📚';
+                            ctaColor = '#d97706';
+                        }
+                    }
+
+                    wadahUtama.innerHTML += `
+                        <div class="schedule-card ${statusClass} ${classKlik}" ${atributKlik}>
+                            <span class="status-badge ${badgeClass}">${label}</span>
+                            <h4 class="schedule-class">${jadwal.kelas.nama_kelas}</h4>
+                            <span class="schedule-time">🕒 ${jamMulai} - ${jamSelesai}</span>
+                            <span style="display:block; margin-top: 10px; font-size: 0.85em; color: ${ctaColor}; font-weight: bold;">${ctaText}</span>
+                        </div>
+                    `;
+                });
+            }
+        });
+
+        // --- FUNGSI KLIK JADWAL -> LANGSUNG MENUJU INPUT PRESENSI ---
+        // Dibuat global agar bisa dipanggil dari HTML onclick
+        window.bukaPresensiDariJadwal = function(kelasId) {
+            // 1. Klik menu presensi di sidebar
+            document.getElementById('menuPresensi').click();
+            
+            // 2. Tunggu sebentar hingga form presensi dirender oleh JS, lalu isi kelasnya
+            setTimeout(() => {
+                const dropdownKelas = document.getElementById('selectKelasPresensi');
+                if (dropdownKelas) {
+                    dropdownKelas.value = kelasId;
+                    // Paksa dropdown untuk 'berubah' (trigger event change) agar daftar siswa langsung dimuat
+                    dropdownKelas.dispatchEvent(new Event('change'));
+                }
+            }, 300); // delay 300ms
+        };
+
+        // Fungsi Global Hapus Materi
+        window.hapusMateri = async function(id) {
+            if (confirm('Yakin ingin menghapus tautan ini?')) {
+                const { error } = await supabase.from('materi_link').delete().eq('id', id);
+                if (error) {
+                    alert('Gagal menghapus materi: ' + error.message);
+                } else {
+                    muatDaftarMateriLengkap(); // Segarkan tabel otomatis
+                }
+            }
+        };
+
+        // --- 8. LOGIKA MENU KELOLA JADWAL ---
+        const menuAturJadwal = document.getElementById('menuAturJadwal');
+        menuAturJadwal.addEventListener('click', async (e) => {
+            e.preventDefault();
+            if (!validasiPindahData()) return;
+
+            contentArea.innerHTML = `
+                <h2>Kelola Jadwal Mengajar</h2>
+                
+                <div style="background: #f8fafc; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #e2e8f0;">
+                    <h3>Tambah Jadwal Baru</h3>
+                    <div class="flex-container" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 120px;">
+                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">Hari</label>
+                            <select id="inputHari" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+                                <option value="1">Senin</option><option value="2">Selasa</option>
+                                <option value="3">Rabu</option><option value="4">Kamis</option>
+                                <option value="5">Jumat</option><option value="6">Sabtu</option>
+                            </select>
+                        </div>
+                        <div style="flex: 2; min-width: 150px;">
+                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">Kelas</label>
+                            <select id="inputKelasJadwal" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px;"></select>
+                        </div>
+                        <div style="flex: 1; min-width: 100px;">
+                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">Mulai</label>
+                            <input type="time" id="inputJamMulai" style="width: 96%; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+                        </div>
+                        <div style="flex: 1; min-width: 100px;">
+                            <label style="display: block; font-weight: bold; margin-bottom: 5px;">Selesai</label>
+                            <input type="time" id="inputJamSelesai" style="width: 96%; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+                        </div>
+                    </div>
+                    <button id="btnSimpanJadwal" style="background: #059669; color: white; border: none; padding: 12px; margin-top: 15px; border-radius: 4px; width: 100%; cursor: pointer;">➕ Tambah Jadwal</button>
+                </div>
+
+                <div style="background: white; padding: 15px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                    <h3 style="margin-top: 0;">Daftar Jadwal Saat Ini</h3>
+                    <p style="font-size: 0.9em; color: #6b7280; margin-top: -10px;">Jika berganti semester atau jam, silakan hapus jadwal lama dan buat yang baru di atas.</p>
+                    
+                    <div class="table-responsive">
+                        <table style="width: 100%; border-collapse: collapse; min-width: 300px;">
+                            <thead>
+                                <tr style="background: #1e293b; color: white;">
+                                    <th style="padding: 10px; border: 1px solid #ccc; text-align: left;">Hari</th>
+                                    <th style="padding: 10px; border: 1px solid #ccc; text-align: left;">Kelas</th>
+                                    <th style="padding: 10px; border: 1px solid #ccc; text-align: center;">Waktu</th>
+                                    <th style="padding: 10px; border: 1px solid #ccc; text-align: center;">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelBodyJadwal">
+                                <tr><td colspan="4" style="text-align:center; padding:10px;">Memuat data...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+
+            // 1. Muat opsi kelas ke dropdown form
+            const selectKelas = document.getElementById('inputKelasJadwal');
+            const { data } = await supabase.from('kelas').select('*').order('nama_kelas');
+            if (data) {
+                selectKelas.innerHTML = '<option value="">-- Pilih Kelas --</option>';
+                data.forEach(k => selectKelas.innerHTML += `<option value="${k.id}">${k.nama_kelas}</option>`);
+            }
+
+            // 2. Render tabel daftar jadwal yang ada di database
+            await muatDaftarJadwalAktif();
+
+            // 3. Event Listener Tombol Simpan
+            document.getElementById('btnSimpanJadwal').addEventListener('click', async () => {
+                const hari = document.getElementById('inputHari').value;
+                const kelas = document.getElementById('inputKelasJadwal').value;
+                const mulai = document.getElementById('inputJamMulai').value;
+                const selesai = document.getElementById('inputJamSelesai').value;
+
+                if(!kelas) return alert("Pilih kelas terlebih dahulu!");
+                if(!mulai || !selesai) return alert("Waktu mulai dan selesai wajib diisi!");
+
+                const btn = document.getElementById('btnSimpanJadwal');
+                btn.innerText = 'Menyimpan...';
+
+                const { error } = await supabase.from('jadwal_mengajar').insert([{
+                    hari_int: parseInt(hari),
+                    kelas_id: kelas,
+                    jam_mulai: mulai,
+                    jam_selesai: selesai
+                }]);
+
+                if(error) {
+                    alert("Gagal: " + error.message);
+                } else { 
+                    // Kosongkan form waktu agar siap input selanjutnya
+                    document.getElementById('inputJamMulai').value = '';
+                    document.getElementById('inputJamSelesai').value = '';
+                    // Muat ulang tabel jadwal di bawahnya
+                    muatDaftarJadwalAktif(); 
+                }
+                btn.innerText = '➕ Tambah Jadwal';
+            });
+        });
+
+        // --- FUNGSI PENDUKUNG KELOLA JADWAL ---
+
+        async function muatDaftarJadwalAktif() {
+            const tbody = document.getElementById('tabelBodyJadwal');
+            const { data, error } = await supabase.from('jadwal_mengajar').select('*, kelas(nama_kelas)').order('hari_int').order('jam_mulai');
+
+            if (error || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:10px; color:#6b7280;">Belum ada jadwal mengajar.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            data.forEach(j => {
+                const jamMulai = j.jam_mulai.substring(0, 5);
+                const jamSelesai = j.jam_selesai.substring(0, 5);
+                
+                tbody.innerHTML += `
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid #ccc; font-weight: bold;">${namaHari[j.hari_int]}</td>
+                        <td style="padding: 10px; border: 1px solid #ccc;">${j.kelas.nama_kelas}</td>
+                        <td style="padding: 10px; border: 1px solid #ccc; text-align: center;">${jamMulai} - ${jamSelesai}</td>
+                        <td style="padding: 10px; border: 1px solid #ccc; text-align: center;">
+                            <button onclick="hapusJadwal(${j.id})" style="background: #ef4444; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">🗑️ Hapus</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        // Fungsi Global untuk menghapus jadwal (bisa dipanggil dari onclick HTML)
+        window.hapusJadwal = async function(id) {
+            if (confirm('Yakin ingin menghapus jadwal ini?')) {
+                const { error } = await supabase.from('jadwal_mengajar').delete().eq('id', id);
+                if (error) {
+                    alert('Gagal menghapus jadwal: ' + error.message);
+                } else {
+                    // Segarkan tabel secara otomatis
+                    muatDaftarJadwalAktif(); 
+                }
+            }
+        };
+
+        // --- 9. LOGIKA MENU REKAP PRESENSI ---
+        const menuRekapPresensi = document.getElementById('menuRekapPresensi');
+        
+        // Simpan data mentah secara global untuk kebutuhan export CSV
+        let dataRekapGlobal = []; 
+        let daftarTanggalGlobal = [];
+
+        menuRekapPresensi.addEventListener('click', async (e) => {
+            e.preventDefault();
+            if (!validasiPindahData()) return;
+
+            contentArea.innerHTML = `
+                <h2>Rekapitulasi Presensi</h2>
+                
+                <div style="background: #f8fafc; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #e2e8f0; display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
+                    <div style="flex: 1; min-width: 200px;">
+                        <label style="display: block; font-weight: bold; margin-bottom: 5px;">Pilih Kelas untuk Direkap</label>
+                        <select id="selectKelasRekap" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+                            <option value="">Memuat kelas...</option>
+                        </select>
+                    </div>
+                    <button id="btnExportCsv" style="background: #10b981; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; height: 40px; display: none;">📥 Export ke Excel/CSV</button>
+                </div>
+
+                <div id="areaTabelRekap" style="display: none">
+                    <div class="table-responsive">
+                        <table style="width: 100%; border-collapse: collapse; min-width: 300px;">
+                            <thead>
+                                <tr style="background: #1e293b; color: white;">
+                                    <th style="padding: 10px; border: 1px solid #ccc; text-align: left; width: 20%;">NIS</th>
+                                    <th style="padding: 10px; border: 1px solid #ccc; text-align: left; width: 50%;">Nama Siswa</th>
+                                    <th style="padding: 10px; border: 1px solid #ccc; text-align: center; width: 20%;">H/A</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelBodyRekap">
+                                <tr><td colspan="3" style="text-align:center; padding:10px;">Memilih data...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+
+            // Muat opsi kelas
+            const selectKelas = document.getElementById('selectKelasRekap');
+            const { data } = await supabase.from('kelas').select('*').order('nama_kelas');
+            if (data) {
+                selectKelas.innerHTML = '<option value="">-- Silakan Pilih Kelas --</option>';
+                data.forEach(k => selectKelas.innerHTML += `<option value="${k.id}">${k.nama_kelas}</option>`);
+            }
+
+            // Event listener saat kelas dipilih
+            selectKelas.addEventListener('change', muatDataRekap);
+            
+            // Event listener untuk export
+            document.getElementById('btnExportCsv').addEventListener('click', exportRekapKeCsv);
+        });
+
+        // --- FUNGSI PENGOLAHAN REKAP ---
+        async function muatDataRekap() {
+            const kelasId = document.getElementById('selectKelasRekap').value;
+            const areaTabel = document.getElementById('areaTabelRekap');
+            const tbody = document.getElementById('tabelBodyRekap');
+            const btnExport = document.getElementById('btnExportCsv');
+            
+            if (!kelasId) {
+                areaTabel.style.display = 'none';
+                btnExport.style.display = 'none';
+                return;
+            }
+
+            areaTabel.style.display = 'block';
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:10px;">Menghitung rekapitulasi...</td></tr>';
+
+            // 1. Ambil data siswa aktif di kelas tersebut
+            const { data: dataSiswa, error: errSiswa } = await supabase.from('siswa').select('id, nis, nama').eq('kelas_id', kelasId).eq('is_aktif', true).order('nama');
+            
+            if (errSiswa || dataSiswa.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:10px; color: red;">Tidak ada data siswa.</td></tr>';
+                btnExport.style.display = 'none';
+                return;
+            }
+
+            // Dapatkan array berisi ID siswa untuk melakukan query presensi
+            const idSiswaArray = dataSiswa.map(s => s.id);
+
+            // 2. Ambil SEMUA data presensi untuk siswa-siswa di kelas ini
+            const { data: dataPresensi } = await supabase.from('presensi').select('siswa_id, tanggal, status').in('siswa_id', idSiswaArray).order('tanggal');
+
+            // 3. Olah data (Hitung Persentase & Siapkan Pivot)
+            const mapRekap = {};
+            const setTanggal = new Set(); // Untuk menyimpan tanggal unik secara otomatis
+
+            // Siapkan struktur awal per siswa
+            dataSiswa.forEach(siswa => {
+                mapRekap[siswa.id] = {
+                    nis: siswa.nis,
+                    nama: siswa.nama,
+                    totalHari: 0,
+                    hadir: 0,
+                    riwayatHarian: {} // Format: { "2023-10-01": "H", "2023-10-02": "A" }
+                };
+            });
+
+            // Masukkan data presensi ke dalam struktur
+            if (dataPresensi) {
+                dataPresensi.forEach(p => {
+                    if (mapRekap[p.siswa_id]) {
+                        mapRekap[p.siswa_id].riwayatHarian[p.tanggal] = p.status;
+                        mapRekap[p.siswa_id].totalHari += 1;
+                        if (p.status === 'H') {
+                            mapRekap[p.siswa_id].hadir += 1;
+                        }
+                        setTanggal.add(p.tanggal);
+                    }
+                });
+            }
+
+            // Konversi Set tanggal menjadi Array yang urut
+            daftarTanggalGlobal = Array.from(setTanggal).sort();
+
+            // 4. Render ke layar (Hanya NIS, Nama, Persentase)
+            tbody.innerHTML = '';
+            dataRekapGlobal = []; // Reset data global
+
+            dataSiswa.forEach(siswa => {
+                const rekap = mapRekap[siswa.id];
+                dataRekapGlobal.push(rekap); // Simpan untuk export
+
+                // Hitung persentase (Cegah pembagian dengan 0 jika belum pernah diabsen)
+                let persentase = 0;
+                if (rekap.totalHari > 0) {
+                    persentase = Math.round((rekap.hadir / rekap.totalHari) * 100);
+                }
+
+                // Beri warna teks indikator (Hijau jika > 80%, Merah jika < 50%)
+                let warnaPersen = '#1f2937'; // Default hitam/gelap
+                if (persentase >= 80) warnaPersen = '#059669';
+                else if (persentase <= 50) warnaPersen = '#dc2626';
+
+                const teksPersen = rekap.totalHari > 0 ? `${persentase}%` : '-';
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid #ccc; font-size: 0.9em;">${rekap.nis}</td>
+                        <td style="padding: 10px; border: 1px solid #ccc; font-weight: bold;">${rekap.nama}</td>
+                        <td style="padding: 10px; border: 1px solid #ccc; text-align: center; font-weight: bold; color: ${warnaPersen};">
+                            ${teksPersen} <br>
+                            <span style="font-size: 0.75em; color: #6b7280; font-weight: normal;">(${rekap.hadir}/${rekap.totalHari})</span>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            // Tampilkan tombol export jika ada data presensi yang diolah
+            if (daftarTanggalGlobal.length > 0) {
+                btnExport.style.display = 'inline-block';
+            } else {
+                btnExport.style.display = 'none';
+            }
+        }
+
+        // --- FUNGSI EXPORT KE CSV (PIVOT TABLE) ---
+        function exportRekapKeCsv() {
+            if (dataRekapGlobal.length === 0 || daftarTanggalGlobal.length === 0) return;
+
+            // 1. Buat Header CSV (NIS, Nama, Persentase, [Tanggal 1], [Tanggal 2]...)
+            let csvContent = "NIS,Nama Siswa,Persentase";
+            daftarTanggalGlobal.forEach(tgl => {
+                csvContent += `,${tgl}`;
+            });
+            csvContent += "\n";
+
+            // 2. Isi Baris Data per Siswa
+            dataRekapGlobal.forEach(rekap => {
+                let persentase = rekap.totalHari > 0 ? Math.round((rekap.hadir / rekap.totalHari) * 100) + '%' : '0%';
+                
+                // Escape nama jika ada tanda koma (standar CSV)
+                let namaAman = `"${rekap.nama}"`; 
+                
+                let baris = `${rekap.nis},${namaAman},${persentase}`;
+
+                // Cek status di setiap tanggal, jika tidak ada (misal siswa baru), kosongkan
+                daftarTanggalGlobal.forEach(tgl => {
+                    const status = rekap.riwayatHarian[tgl] || '-';
+                    baris += `,${status}`;
+                });
+
+                csvContent += baris + "\n";
+            });
+
+            // 3. Trigger Download File
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            
+            // Nama file otomatis: Rekap_Presensi_YYYY-MM-DD.csv
+            const hariIni = new Date().toISOString().split('T')[0];
+            link.setAttribute("href", url);
+            link.setAttribute("download", `Rekap_Presensi_${hariIni}.csv`);
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        async function muatSaranNamaTes() {
+            // Ambil kolom nama_tes dari database
+            const { data, error } = await supabase.from('nilai').select('nama_tes');
+            
+            if (error || !data) return;
+
+            // Gunakan JavaScript 'Set' untuk menyingkirkan nama yang duplikat 
+            // (karena jika ada 30 siswa ikut Speaking Test, akan ada 30 baris data Speaking Test)
+            const namaUnik = [...new Set(data.map(item => item.nama_tes))];
+            
+            const datalist = document.getElementById('saranNamaTes');
+            datalist.innerHTML = ''; // Kosongkan dulu
+            
+            // Masukkan nama-nama unik tersebut ke dalam opsi datalist
+            namaUnik.forEach(nama => {
+                datalist.innerHTML += `<option value="${nama}">`;
+            });
+        }
+
+        // Otomatis memuat Beranda & Jadwal saat login / halaman dimuat
+        setTimeout(() => {
+            document.getElementById('menuHome').click();
+        }, 100);
+    </script>
+</body>
+</html>
