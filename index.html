@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kelas Bahasa Inggris</title>
+    <style>
+        body { font-family: sans-serif; background-color: #f3f4f6; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .profile { text-align: center; margin-bottom: 20px; }
+        .profile img { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; }
+        .link-container { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 10px; }
+        
+        /* Tombol Link Standar */
+        .link-btn { display: block; background: #ffffff; color: #1f2937; text-decoration: none; padding: 15px; text-align: center; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); font-weight: bold; border: 1px solid #e5e7eb; transition: 0.2s; position: relative; }
+        .link-btn:hover { background: #f9fafb; transform: translateY(-2px); }
+        .akademik-btn { background: #2563eb; color: white; border: none; }
+        .akademik-btn:hover { background: #1d4ed8; }
+
+        /* Sistem Label (Badge) Fleksibel */
+        .badge-container { display: flex; gap: 5px; justify-content: center; flex-wrap: wrap; margin-bottom: 8px; }
+        .badge { font-size: 0.75em; padding: 3px 8px; border-radius: 10px; font-weight: normal; color: white; }
+        .badge-cat { background: #4f46e5; } /* Ungu untuk Kategori */
+        .badge-class { background: #d97706; } /* Oranye untuk Kelas */
+
+        /* Sistem Tab */
+        .tab-header { display: flex; justify-content: center; gap: 5px; margin-bottom: 15px; flex-wrap: wrap; }
+        .tab-btn { background: #e5e7eb; color: #4b5563; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-weight: bold; transition: 0.2s; font-size: 0.9em; }
+        .tab-btn.active { background: #10b981; color: white; }
+        .tab-content { display: none; flex-direction: column; gap: 10px; }
+        .tab-content.active { display: flex; }
+    </style>
+</head>
+<body>
+    <div class="profile">
+        <img src="https://ui-avatars.com/api/?name=English+Class&background=0D8ABC&color=fff" alt="Profile">
+        <h2>Kelas Bahasa Inggris</h2>
+        <p style="color: #4b5563; margin-top: -10px;">Portal Materi & Akademik Siswa SMK</p>
+    </div>
+
+    <div class="link-container">
+        <a href="akademik.html" class="link-btn akademik-btn">ðŸŽ“ Cek Nilai & Presensi</a>
+        <hr style="width: 100%; border: 0; border-top: 1px solid #d1d5db; margin: 10px 0;">
+        
+        <div class="tab-header" id="tabHeaderContainer"></div>
+
+        <div id="materiContainerLengkap">
+            <p style="text-align: center; color: #6b7280;">Memuat materi pelajaran...</p>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+
+        // MASUKKAN URL DAN KEY SUPABASE ANDA DI SINI
+        const supabaseUrl = 'https://dtbomtpvdpwpbbmcjvnf.supabase.co'
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0Ym9tdHB2ZHB3cGJibWNqdm5mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2OTEwOTEsImV4cCI6MjA5ODI2NzA5MX0.V15MIuScZFKmQMPUIBRg7tHND-1HVOH_yg3ElBMHcts'
+
+        const supabase = createClient(supabaseUrl, supabaseKey)
+
+        // Fungsi pintar untuk menebak "Tingkat Kelas" (10, 11, 12) dari string nama kelas SMK
+        function ekstrakTingkatKelas(namaKelas) {
+            const nama = namaKelas.toUpperCase().trim();
+            if (nama.startsWith('X ') || nama.startsWith('10')) return 'Kelas 10';
+            if (nama.startsWith('XI ') || nama.startsWith('11')) return 'Kelas 11';
+            if (nama.startsWith('XII ') || nama.startsWith('12')) return 'Kelas 12';
+            return 'Lainnya';
+        }
+
+        async function muatMateriBerdasarkanTab() {
+            const wadahTab = document.getElementById('tabHeaderContainer');
+            const wadahKonten = document.getElementById('materiContainerLengkap');
+
+            const { data, error } = await supabase.from('materi_link')
+                .select('*, kategori_materi(nama_kategori), materi_kelas(kelas(nama_kelas))')
+                .order('created_at', { ascending: false });
+
+            if (error || data.length === 0) {
+                wadahKonten.innerHTML = '<p style="text-align: center; color: #6b7280;">Belum ada materi aktif.</p>';
+                return;
+            }
+
+            // 1. Kelompokkan materi ke dalam "Ember" tingkat kelas
+            const kelompokMateri = { 'Umum': [], 'Kelas 10': [], 'Kelas 11': [], 'Kelas 12': [] };
+
+            data.forEach(materi => {
+                // Jika tidak ditargetkan ke kelas mana pun, masuk ke tab Umum
+                if (!materi.materi_kelas || materi.materi_kelas.length === 0) {
+                    kelompokMateri['Umum'].push(materi);
+                    return;
+                }
+
+                // Cek materi ini masuk ke tingkat apa saja (bisa lebih dari satu jika digabung)
+                const tingkatTeridentifikasi = new Set();
+                materi.materi_kelas.forEach(mk => {
+                    tingkatTeridentifikasi.add(ekstrakTingkatKelas(mk.kelas.nama_kelas));
+                });
+
+                tingkatTeridentifikasi.forEach(tingkat => {
+                    if (kelompokMateri[tingkat]) {
+                        kelompokMateri[tingkat].push(materi);
+                    }
+                });
+            });
+
+            // 2. Buat UI Tab dan Kontennya
+            wadahTab.innerHTML = '';
+            wadahKonten.innerHTML = '';
+            let isTabPertamaAktif = false;
+
+            // Loop untuk membuat tab secara berurutan
+            ['Umum', 'Kelas 10', 'Kelas 11', 'Kelas 12'].forEach(tingkat => {
+                if (kelompokMateri[tingkat].length > 0) {
+                    
+                    const idTab = tingkat.replace(' ', ''); // Hapus spasi untuk ID HTML
+                    const statusAktif = !isTabPertamaAktif ? 'active' : '';
+
+                    // Buat Tombol Tab
+                    wadahTab.innerHTML += `<button class="tab-btn ${statusAktif}" onclick="bukaTab('${idTab}')" data-target="${idTab}">${tingkat}</button>`;
+
+                    // Buat Wadah Konten Tab
+                    let htmlKonten = `<div class="tab-content ${statusAktif}" id="content_${idTab}">`;
+                    
+                    // Render isi link di dalam tab tersebut
+                    kelompokMateri[tingkat].forEach(materi => {
+                        // 1. Siapkan Label Kategori
+                        const kategori = materi.kategori_materi ? materi.kategori_materi.nama_kategori : '';
+                        const htmlKategori = kategori ? `<span class="badge badge-cat">ðŸ“‚ ${kategori}</span>` : '';
+                        
+                        // 2. Siapkan Label Kelas
+                        let htmlKelas = '';
+                        if (materi.materi_kelas && materi.materi_kelas.length > 0) {
+                            const daftarKelas = materi.materi_kelas.map(mk => mk.kelas.nama_kelas).join(', ');
+                            htmlKelas = `<span class="badge badge-class">ðŸŽ¯ ${daftarKelas}</span>`;
+                        } else {
+                            htmlKelas = `<span class="badge badge-class">ðŸŽ¯ Umum</span>`;
+                        }
+                        
+                        // 3. Susun HTML Kartu Link
+                        htmlKonten += `
+                            <a href="${materi.url}" target="_blank" class="link-btn">
+                                <div class="badge-container">
+                                    ${htmlKategori}
+                                    ${htmlKelas}
+                                </div>
+                                <span style="display:block; font-size: 1.1em;">${materi.judul}</span>
+                                <div style="font-size: 0.85em; font-weight: normal; color: #6b7280; margin-top: 5px;">${materi.deskripsi || ''}</div>
+                            </a>
+                        `;
+                    });
+                    
+                    htmlKonten += `</div>`;
+                    wadahKonten.innerHTML += htmlKonten;
+
+                    isTabPertamaAktif = true; // Tab pertama yang memiliki data akan langsung terbuka
+                }
+            });
+        }
+
+        // Fungsi Global untuk pindah Tab (harus ditaruh di window agar bisa dipanggil onclick)
+        window.bukaTab = function(idTab) {
+            // Sembunyikan semua konten dan matikan warna tombol
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            
+            // Tampilkan yang dipilih
+            document.getElementById('content_' + idTab).classList.add('active');
+            document.querySelector(`button[data-target="${idTab}"]`).classList.add('active');
+        };
+
+        muatMateriBerdasarkanTab();
+    </script>
+</body>
+</html>
