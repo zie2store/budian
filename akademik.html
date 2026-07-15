@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cek Nilai & Presensi</title>
+    <style>
+        body { font-family: sans-serif; background-color: #f3f4f6; padding: 20px; max-width: 600px; margin: auto; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        input, button { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 4px; box-sizing: border-box; }
+        input { border: 1px solid #ccc; font-size: 1em; }
+        button { background: #2563eb; color: white; border: none; font-weight: bold; font-size: 1em; cursor: pointer; }
+        button:hover { background: #1d4ed8; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9em; }
+        th, td { border: 1px solid #e5e7eb; padding: 10px; text-align: left; }
+        th { background: #f8fafc; color: #374151; }
+        .nav-back { display: inline-block; margin-bottom: 15px; text-decoration: none; color: #2563eb; font-weight: bold; }
+        /* Wrapper Tabel Responsif */
+        .table-responsive { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 10px; }
+        
+        /* Memperbesar target sentuhan (Tap Target) untuk HP */
+        input, button { padding: 14px; font-size: 16px; } 
+
+        @media (max-width: 600px) {
+            body { padding: 10px; }
+            .card { padding: 15px; }
+            th, td { padding: 8px; font-size: 0.9em; }
+        }
+    </style>
+</head>
+<body>
+    <a href="/dipo" class="nav-back">&larr; Kembali ke Beranda</a>
+    
+    <div class="card">
+        <h2 style="margin-top: 0;">Portal Akademik Siswa</h2>
+        <p style="color: #6b7280; font-size: 0.9em;">Masukkan Nomor Induk Siswa (NIS) untuk melihat rekap kehadiran dan nilai ujian Anda.</p>
+        
+        <input type="text" id="inputNis" placeholder="Ketik NIS Anda di sini...">
+        <button id="btnCari">🔍 Cari Data Saya</button>
+        <div id="pesanError" style="color: red; margin-top: 10px; font-size: 0.9em; display: none;"></div>
+    </div>
+
+    <div id="areaHasil" style="display: none;">
+        <div class="card" style="background: #eff6ff; border-left: 4px solid #2563eb;">
+            <h3 style="margin-top:0;">Profil Siswa</h3>
+            <p style="margin: 5px 0;"><strong>Nama:</strong> <span id="labelNama">-</span></p>
+            <p style="margin: 5px 0;"><strong>NIS:</strong> <span id="labelNis">-</span></p>
+        </div>
+
+        <div class="card">
+            <h3 style="margin-top:0;">Rekap Kehadiran</h3>
+            <div id="tabelPresensi"></div>
+        </div>
+
+        <div class="card">
+            <h3 style="margin-top:0;">Rekap Nilai Tugas / Ujian</h3>
+            <div id="tabelNilai"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+
+        // MASUKKAN URL DAN KEY SUPABASE ANDA DI SINI
+         const supabaseUrl = 'https://dtbomtpvdpwpbbmcjvnf.supabase.co'
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0Ym9tdHB2ZHB3cGJibWNqdm5mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2OTEwOTEsImV4cCI6MjA5ODI2NzA5MX0.V15MIuScZFKmQMPUIBRg7tHND-1HVOH_yg3ElBMHcts'
+
+        const supabase = createClient(supabaseUrl, supabaseKey)
+
+        const btnCari = document.getElementById('btnCari');
+        const areaHasil = document.getElementById('areaHasil');
+        const pesanError = document.getElementById('pesanError');
+
+        btnCari.addEventListener('click', async () => {
+            const nis = document.getElementById('inputNis').value.trim();
+            if (!nis) return;
+
+            btnCari.innerText = 'Mencari...';
+            pesanError.style.display = 'none';
+            areaHasil.style.display = 'none';
+
+            // 1. Validasi: Cari ID siswa berdasarkan NIS
+            const { data: siswaData, error: siswaError } = await supabase.from('siswa').select('*').eq('nis', nis).single();
+
+            if (siswaError || !siswaData) {
+                pesanError.innerText = 'Data siswa tidak ditemukan. Pastikan NIS yang dimasukkan benar.';
+                pesanError.style.display = 'block';
+                btnCari.innerText = '🔍 Cari Data Saya';
+                return;
+            }
+
+            // Tampilkan label nama & NIS
+            document.getElementById('labelNama').innerText = siswaData.nama;
+            document.getElementById('labelNis').innerText = siswaData.nis;
+
+            // 2. Ambil Riwayat Presensi (Urutkan dari tanggal terbaru)
+            const { data: presensiData } = await supabase.from('presensi').select('*').eq('siswa_id', siswaData.id).order('tanggal', { ascending: false });
+            renderPresensi(presensiData);
+
+            // 3. Ambil Riwayat Nilai (Urutkan dari tanggal terbaru)
+            const { data: nilaiData } = await supabase.from('nilai').select('*').eq('siswa_id', siswaData.id).order('tanggal', { ascending: false });
+            renderNilai(nilaiData);
+
+            // Munculkan area hasil
+            areaHasil.style.display = 'block';
+            btnCari.innerText = '🔍 Cari Data Saya';
+        });
+
+        // Fungsi mengubah data JSON presensi menjadi HTML tabel
+        function renderPresensi(data) {
+            const wadah = document.getElementById('tabelPresensi');
+            if (!data || data.length === 0) {
+                wadah.innerHTML = '<p style="color: #6b7280; font-size: 0.9em;">Belum ada riwayat presensi.</p>';
+                return;
+            }
+            
+            let html = '<div class="table-responsive"><table style="min-width: 400px;"><tr><th>Tanggal</th><th>Status</th><th>Keterangan</th></tr>';
+            data.forEach(p => {
+                let iconStatus = '';
+                if(p.status === 'H') iconStatus = '✅ Hadir';
+                else if(p.status === 'S') iconStatus = '🤒 Sakit';
+                else if(p.status === 'I') iconStatus = '📝 Izin';
+                else if(p.status === 'A') iconStatus = '❌ Alpa';
+                
+                const keterangan = p.keterangan ? p.keterangan : '-';
+                html += `<tr><td>${p.tanggal}</td><td>${iconStatus}</td><td>${keterangan}</td></tr>`;
+            });
+            html += '</table>';
+            wadah.innerHTML = html;
+        }
+
+        // Fungsi mengubah data JSON nilai menjadi HTML tabel
+        function renderNilai(data) {
+            const wadah = document.getElementById('tabelNilai');
+            if (!data || data.length === 0) {
+                wadah.innerHTML = '<p style="color: #6b7280; font-size: 0.9em;">Belum ada riwayat ujian/tugas.</p>';
+                return;
+            }
+            
+            let html = '<table><tr><th>Nama Tes</th><th>Tanggal</th><th style="text-align: center;">Skor</th></tr>';
+            data.forEach(n => {
+                html += `<tr><td>${n.nama_tes}</td><td>${n.tanggal}</td><td style="text-align: center; font-weight: bold;">${n.skor}</td></tr>`;
+            });
+            html += '</table>';
+            wadah.innerHTML = html;
+        }
+    </script>
+</body>
+</html>
